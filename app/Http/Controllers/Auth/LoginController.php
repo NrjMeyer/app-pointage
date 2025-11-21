@@ -38,7 +38,8 @@ class LoginController extends Controller
             $user->save();
 
             session(['uti_login_token' => $user->UTI_Login_Token]);
-            return redirect()->route('dashboard');
+            $redirect = $user->UTI_Role == "admin" ? 'admin/dashboard' : 'dashboard';
+            return redirect($redirect);
         }
 
         return back()->withErrors([
