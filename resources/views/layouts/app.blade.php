@@ -96,10 +96,17 @@
                 @auth
 
                     <li class="nav-item">
-                        <a href="{{ route('dashboard') }}"
-                           class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
-                            Tableau de bord
-                        </a>
+                        @if(auth()->user()->UTI_Role === 'admin')
+                            <a href="{{ route('admin.dashboard') }}"
+                               class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
+                                Tableau de bord
+                            </a>
+                        @else
+                            <a href="{{ route('dashboard') }}"
+                               class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
+                                Tableau de bord
+                            </a>
+                        @endif
                     </li>
 
                     @if(auth()->user()->UTI_Role === 'admin')
