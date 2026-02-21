@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\WorkSessionController;
+use App\Http\Controllers\Admin\AIPAdresseIpController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
@@ -15,17 +16,19 @@ Route::post('/login', [LoginController::class, 'login'])->name('login.post');
 
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
-Route::middleware(['auth','check.login.token'])->group(function () {
+Route::middleware(['auth', 'check.login.token'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
+
+    Route::get('/pointage', [DashboardController::class, 'pointage'])
+        ->name('pointage');
 
     Route::post('/session/start', [DashboardController::class, 'startSession'])
         ->name('session.start');
 
     Route::post('/session/close', [DashboardController::class, 'closeSession'])
         ->name('session.close');
-
 });
 Route::middleware(['check.login.token', 'role:admin'])
     ->prefix('admin')
@@ -50,7 +53,7 @@ Route::middleware(['check.login.token', 'role:admin'])
         Route::put('/users/{id}/update', [UserController::class, 'update'])
             ->name('admin.users.update');
 
-        Route::post('/users/{id}/destroy', [UserController::class, 'destroy'])
+        Route::delete('/users/{id}/destroy', [UserController::class, 'destroy'])
             ->name('admin.users.destroy');
 
         Route::get('/sessions', [WorkSessionController::class, 'index'])
@@ -71,9 +74,18 @@ Route::middleware(['check.login.token', 'role:admin'])
         Route::post('/sessions/store', [WorkSessionController::class, 'store'])
             ->name('admin.sessions.store');
 
-        Route::post('/sessions/{id}/destroy', [WorkSessionController::class, 'destroy'])
+        Route::delete('/sessions/{id}/destroy', [WorkSessionController::class, 'destroy'])
             ->name('admin.sessions.destroy');
 
         Route::get('sessions/crosstable', [WorkSessionController::class, 'crossTable'])
             ->name('admin.sessions.crosstable');
+
+        // IP Management
+        Route::get('/ips', [AIPAdresseIpController::class, 'index'])->name('admin.ips.index');
+        Route::post('/ips/store-current', [AIPAdresseIpController::class, 'storeCurrent'])->name('admin.ips.store_current');
+        Route::get('/ips/create', [AIPAdresseIpController::class, 'create'])->name('admin.ips.create');
+        Route::post('/ips/store', [AIPAdresseIpController::class, 'store'])->name('admin.ips.store');
+        Route::get('/ips/{id}/edit', [AIPAdresseIpController::class, 'edit'])->name('admin.ips.edit');
+        Route::put('/ips/{id}/update', [AIPAdresseIpController::class, 'update'])->name('admin.ips.update');
+        Route::delete('/ips/{id}/destroy', [AIPAdresseIpController::class, 'destroy'])->name('admin.ips.destroy');
     });

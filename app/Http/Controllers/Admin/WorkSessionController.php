@@ -49,9 +49,9 @@ class WorkSessionController extends Controller
             'WRK_UTI_ID' => $request->WRK_UTI_ID,
             'WRK_Dte_Heure_Deb' => $request->WRK_Dte_Heure_Deb,
             'WRK_Dte_Heure_Fin' => $request->WRK_Dte_Heure_Fin,
-            'WRK_Duree_Min' => $request->WRK_Dte_Heure_Fin
-                ? Carbon::parse($request->WRK_Dte_Heure_Fin)
-                    ->diffInMinutes(Carbon::parse($request->WRK_Dte_Heure_Deb))
+            'WRK_Duree_Minutes' => $request->WRK_Dte_Heure_Fin
+                ? Carbon::parse($request->WRK_Dte_Heure_Deb)
+                ->diffInMinutes(Carbon::parse($request->WRK_Dte_Heure_Fin))
                 : null,
             'WRK_Type_Cloture' => $request->WRK_Dte_Heure_Fin ? 'manuel' : null,
             'WRK_Note' => $request->WRK_Note,
@@ -107,6 +107,7 @@ class WorkSessionController extends Controller
         $session = WorkSession::findOrFail($id);
         if (!$session->WRK_Dte_Heure_Fin) {
             $session->WRK_Dte_Heure_Fin = Carbon::now('Europe/Paris');
+            $session->WRK_Type_Cloture = 'admin';
             $session->WRK_Duree_Minutes = Carbon::parse($session->WRK_Dte_Heure_Deb, 'Europe/Paris')
                 ->diffInMinutes($session->WRK_Dte_Heure_Fin);
             $session->save();
@@ -119,31 +120,65 @@ class WorkSessionController extends Controller
     public function crossTable(Request $request)
     {
 
-        $days = 7;
+        $selectedMonth = $request->input('month', now()->format('Y-m'));
+        $start = Carbon::parse($selectedMonth . '-01')->startOfMonth();
+        $end   = min(Carbon::parse($selectedMonth . '-01')->endOfMonth(), Carbon::now()->endOfDay());
 
-        $dates = collect();
-        for ($i = $days - 1; $i >= 0; $i--) {
-            $dates->push(now()->subDays($i)->format('Y-m-d'));
-        }
+        $utilisateurs = Utilisateur::where('UTI_Actif', 1)->where('UTI_Role', 'employe')->orderBy('UTI_Nom')->get();
 
-        $users = Utilisateur::where('UTI_Role', 'employe')->orderBy('UTI_Nom')->get();
-
-
-        $sessions = WorkSession::whereDate('WRK_Dte_Heure_Deb', '>=', now()->subDays($days - 1)->startOfDay())
-            ->with('utilisateur')
+        // Fetch all sessions for the period
+        $sessions = WorkSession::whereBetween('WRK_Dte_Heure_Deb', [$start, $end])
+            ->orderBy('WRK_Dte_Heure_Deb')
             ->get();
 
-        $grid = [];
-        foreach ($users as $user) {
-            foreach ($dates as $date) {
-                $daySessions = $sessions->filter(function ($s) use ($user, $date) {
-                    return $s->WRK_UTI_ID == $user->UTI_ID &&
-                        \Carbon\Carbon::parse($s->WRK_Dte_Heure_Deb)->format('Y-m-d') == $date;
-                });
-                $grid[$user->UTI_ID][$date] = $daySessions;
+        $totauxMois = [];
+
+        foreach ($utilisateurs as $user) {
+            // Calculate total for user, handling ongoing sessions
+            $userSessions = $sessions->where('WRK_UTI_ID', $user->UTI_ID);
+            $total = 0;
+            foreach ($userSessions as $session) {
+                if ($session->WRK_Duree_Minutes) {
+                    $total += $session->WRK_Duree_Minutes;
+                } elseif (!$session->WRK_Dte_Heure_Fin) {
+                    // Ongoing session: calculate duration until now
+                    $total += Carbon::parse($session->WRK_Dte_Heure_Deb)->diffInMinutes(Carbon::now());
+                }
+            }
+            $totauxMois[$user->UTI_ID] = $total;
+        }
+
+        $jours = collect();
+        for ($d = $end->copy(); $d >= $start; $d->subDay()) {
+            $jours->push($d->format('Y-m-d'));
+        }
+
+        $pivot = [];
+
+        foreach ($jours as $j) {
+            $pivot[$j] = [];
+
+            foreach ($utilisateurs as $u) {
+                $dailySessions = $sessions
+                    ->where('WRK_UTI_ID', $u->UTI_ID)
+                    ->filter(function ($s) use ($j) {
+                        return Carbon::parse($s->WRK_Dte_Heure_Deb)->format('Y-m-d') === $j;
+                    });
+
+                $total = 0;
+                foreach ($dailySessions as $session) {
+                    if ($session->WRK_Duree_Minutes) {
+                        $total += $session->WRK_Duree_Minutes;
+                    } elseif (!$session->WRK_Dte_Heure_Fin) {
+                        // Ongoing session
+                        $total += Carbon::parse($session->WRK_Dte_Heure_Deb)->diffInMinutes(Carbon::now());
+                    }
+                }
+
+                $pivot[$j][$u->UTI_ID] = $total;
             }
         }
 
-        return view('admin.sessions.crosstable', compact('users', 'dates', 'grid'));
+        return view('admin.sessions.crosstable', compact('utilisateurs', 'pivot', 'jours', 'selectedMonth', 'totauxMois'));
     }
 }

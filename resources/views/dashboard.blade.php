@@ -2,19 +2,8 @@
 
 @section('content')
     <div class="card card-modern p-5">
-        <div class="card-header">
-            Tableau de bord
-        </div>
-        <div class="d-flex justify-content-end mb-3">
-            <form action="{{ route('logout') }}" method="POST">
-                @csrf
-                <button class="btn btn-outline-secondary">
-                    Se déconnecter
-                </button>
-            </form>
-        </div>
 
-        @if(session('success'))
+        {{--@if(session('success'))
             <div class="alert alert-success">{{ session('success') }}</div>
         @endif
         @if(session('error'))
@@ -87,7 +76,7 @@
                     @endif
                 </div>
             </div>
-        @endif
+        @endif--}}
 
 
         <h4 class="mb-3">Vos sessions des 7 derniers jours</h4>
@@ -95,38 +84,56 @@
         @if($sessions7Jours->isEmpty())
             <p>Aucune session récente.</p>
         @else
-            <table class="table table-bordered table-striped">
-                <thead class="table-light">
-                <tr>
-                    <th>Date</th>
-                    <th>Début</th>
-                    <th>Fin</th>
-                    <th>Durée (min)</th>
-                    <th>Clôture</th>
-                    <th>Note</th>
+        <table class="table table-marked table-hover align-middle">
+            <thead class="table-light">
+            <tr>
+                <th>Période & Statut</th>
+                <th>Durée</th>
+                <th>Note</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach($sessions7Jours as $s)
+                <tr @if($s->WRK_Est_Cloture_Auto) class="table-warning-subtle" @endif>
+                    <td>
+                        <div class="mb-1">
+                            <span class="fw-bold">{{ \Carbon\Carbon::parse($s->WRK_Dte_Heure_Deb)->format('d/m/Y') }}</span>
+                            <span class="text-muted mx-1">|</span>
+                            <span>{{ \Carbon\Carbon::parse($s->WRK_Dte_Heure_Deb)->format('H:i') }}</span>
+                            <i class="fas fa-arrow-right mx-1 small text-muted"></i>
+                            <span>{{ $s->WRK_Dte_Heure_Fin ? \Carbon\Carbon::parse($s->WRK_Dte_Heure_Fin)->format('H:i') : '...' }}</span>
+                        </div>
+                        @if(!$s->WRK_Dte_Heure_Fin)
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">En cours</span>
+                        @else
+                            <span class="badge bg-light text-muted border">Terminée</span>
+                        @endif
+                        
+                        @if($s->WRK_Est_Cloture_Auto)
+                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle ms-1" title="Clôturée automatiquement">Auto</span>
+                        @endif
+                    </td>
+					<td>
+                        @if($s->WRK_Duree_Minutes)
+                            @php
+                                $minutes = $s->WRK_Duree_Minutes;
+                                $heures = floor($minutes / 60);
+                                $mins = $minutes % 60;
+                            @endphp
+                            <div class="fw-bold">{{ sprintf('%02dh %02dmin', $heures, $mins) }}</div>
+                        @else
+                            <span class="text-muted">-</span>
+                        @endif
+                    </td>
+                    <td>
+                        <div class="text-truncate" style="max-width: 250px;" title="{{ $s->WRK_Note }}">
+                            {{ $s->WRK_Note ?: '-' }}
+                        </div>
+                    </td>
                 </tr>
-                </thead>
-                <tbody>
-
-                @foreach($sessions7Jours as $s)
-                    <tr @if($s->WRK_Est_Cloture_Auto) class="table-warning" @endif>
-                        <td>{{ \Carbon\Carbon::parse($s->WRK_Dte_Heure_Deb)->format('d/m/Y') }}</td>
-                        <td>{{ $s->WRK_Dte_Heure_Deb }}</td>
-                        <td>{{ $s->WRK_Dte_Heure_Fin ?? '—' }}</td>
-                        <td>{{ $s->WRK_Duree_Minutes ?? '—' }}</td>
-                        <td>
-                            @if($s->WRK_Est_Cloture_Auto)
-                                Automatique
-                            @else
-                                Manuel
-                            @endif
-                        </td>
-                        <td>{{ $s->WRK_Note }}</td>
-                    </tr>
-                @endforeach
-
-                </tbody>
-            </table>
+            @endforeach
+            </tbody>
+        </table>
         @endif
 
     </div>

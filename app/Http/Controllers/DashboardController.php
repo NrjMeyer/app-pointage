@@ -33,12 +33,36 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function pointage()
+    {
+        $user = Auth::user();
+
+        $sessionActive = WorkSession::where('WRK_UTI_ID', $user->UTI_ID)
+            ->whereNull('WRK_Dte_Heure_Fin')
+            ->first();
+
+
+        return view('pointage', [
+            'sessionActive'   => $sessionActive,
+        ]);
+    }
+
     /**
      * Démarrer une nouvelle session.
      */
     public function startSession(Request $request)
     {
         $user = Auth::user();
+
+        // Vérification IP pour les non-admins
+        if ($user->UTI_Role !== 'admin' && $user->UTI_IP_Restriction) {
+            $currentIp = $request->ip();
+            $isAllowed = \App\Models\AIPAdresseIp::where('AIP_IP', $currentIp)->exists();
+
+            if (!$isAllowed) {
+                return back()->with('error', 'Action impossible en dehors des bureaux.');
+            }
+        }
 
         $active = WorkSession::where('WRK_UTI_ID', $user->UTI_ID)
             ->whereNull('WRK_Dte_Heure_Fin')
@@ -62,6 +86,7 @@ class DashboardController extends Controller
             'WRK_UTI_ID'        => $user->UTI_ID,
             'WRK_Dte_Heure_Deb' => Carbon::now('Europe/Paris'),
             'WRK_Est_Cloture_Auto' => false,
+            'WRK_IP_Debut'     => $request->ip(),
         ]);
 
         return back()->with('success', 'Session démarrée.');
@@ -74,6 +99,16 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
 
+        // Vérification IP pour les non-admins
+        if ($user->UTI_Role !== 'admin' && $user->UTI_IP_Restriction) {
+            $currentIp = $request->ip();
+            $isAllowed = \App\Models\AIPAdresseIp::where('AIP_IP', $currentIp)->exists();
+
+            if (!$isAllowed) {
+                return back()->with('error', 'Action impossible en dehors des bureaux.');
+            }
+        }
+
         $session = WorkSession::where('WRK_UTI_ID', $user->UTI_ID)
             ->whereNull('WRK_Dte_Heure_Fin')
             ->first();
@@ -85,6 +120,11 @@ class DashboardController extends Controller
         $now = Carbon::now('Europe/Paris');
 
         $debut = Carbon::parse($session->WRK_Dte_Heure_Deb, 'Europe/Paris');
+        $limit = $debut->copy()->setTime(22, 0, 0);
+
+        if ($now->greaterThan($limit)) {
+            $now = $limit;
+        }
         $duree = $debut->diffInMinutes($now);
 
         $session->update([
@@ -93,6 +133,7 @@ class DashboardController extends Controller
             'WRK_Type_Cloture'   => 'manuel',
             'WRK_Est_Cloture_Auto' => false,
             'WRK_Note'           => $request->WRK_Note,
+            'WRK_IP_Fin'        => $request->ip(),
         ]);
 
         return back()->with('success', 'Session clôturée.');

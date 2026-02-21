@@ -30,6 +30,7 @@ class UserController extends Controller
             'UTI_Password' => 'required|string|min:6',
             'UTI_Role' => 'required|in:employe,admin',
             'UTI_Actif' => 'required|boolean',
+            'UTI_IP_Restriction' => 'required|boolean',
         ]);
 
         Utilisateur::create([
@@ -38,6 +39,7 @@ class UserController extends Controller
             'UTI_Password' => Hash::make($request->UTI_Password),
             'UTI_Role' => $request->UTI_Role,
             'UTI_Actif' => $request->UTI_Actif,
+            'UTI_IP_Restriction' => $request->UTI_IP_Restriction,
         ]);
 
         return redirect()->route('admin.users.index')
@@ -62,15 +64,17 @@ class UserController extends Controller
             'UTI_Password' => 'nullable|string|min:6',
             'UTI_Role' => 'required|in:employe,admin',
             'UTI_Actif' => 'required|boolean',
+            'UTI_IP_Restriction' => 'required|boolean',
         ]);
 
         $user->UTI_Nom = $request->UTI_Nom;
         $user->UTI_Email = $request->UTI_Email;
         $user->UTI_Role = $request->UTI_Role;
         $user->UTI_Actif = $request->UTI_Actif;
+        $user->UTI_IP_Restriction = $request->UTI_IP_Restriction;
 
         if ($request->UTI_Password) {
-            $user->UTI_Password = $request->UTI_Password; // setter hash automatique
+            $user->UTI_Password = Hash::make($request->UTI_Password);
         }
 
         $user->save();
@@ -82,7 +86,18 @@ class UserController extends Controller
 
     public function destroy($id)
     {
+        if (auth()->id() == $id) {
+            return redirect()->route('admin.users.index')
+                ->with('error', 'Vous ne pouvez pas supprimer votre propre compte.');
+        }
+
         $user = Utilisateur::findOrFail($id);
+
+        if ($user->sessions()->exists()) {
+            return redirect()->route('admin.users.index')
+                ->with('error', 'Impossible de supprimer cet utilisateur car il possède des sessions de travail (historique de pointage).');
+        }
+
         $user->delete();
 
         return redirect()->route('admin.users.index')
